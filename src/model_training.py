@@ -5,11 +5,13 @@ from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.model_selection import cross_validate, StratifiedKFold
+from sklearn.model_selection import cross_validate, StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
 import joblib
 # Import custom preprocessing pipeline wrapper
 from src.data_preprocessing import create_preprocessing_pipeline
+import optuna
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,7 +71,7 @@ def train_all_models(X_train, y_train):
             continue
             
         # Wrap the model in our data preprocessing steps
-        pipeline = create_preprocessing_pipeline(model=raw_model)
+        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
         
         try:
             cv_results = train_model(pipeline, X_train, y_train)
@@ -105,6 +107,77 @@ def select_top3_model(results):
         
     return top3_names
 
+def objective(trial, model_code, X, y):
+    params = {}
+    
+    if model_code == 'rf':
+        params = {
+            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 300, step=100),
+            'model__max_depth': trial.suggest_categorical('model__max_depth', [5, 10, 15]),
+            'model__min_samples_split': trial.suggest_int('model__min_samples_split', 2, 10),
+            'model__class_weight': trial.suggest_categorical('model__class_weight', ['balanced', None])
+        }
+    elif model_code == 'knn':
+        params = {
+            'model__n_neighbors': trial.suggest_int('model__n_neighbors', 3, 15, step=2),
+            'model__weights': trial.suggest_categorical('model__weights', ['uniform', 'distance']),
+            'model__metric': trial.suggest_categorical('model__metric', ['euclidean', 'manhattan', 'cosine'])
+        } 
+    elif model_code == 'xgb':
+        params = {
+            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 300, step=100),
+            'model__max_depth': trial.suggest_categorical('model__max_depth', [3, 5, 7]),
+            'model__learning_rate': trial.suggest_float('model__learning_rate', 0.01, 0.2, log=True),
+            'model__subsample': trial.suggest_float('model__subsample', 0.7, 1.0),
+            'model__colsample_bytree': trial.suggest_float('model__colsample_bytree', 0.7, 1.0)
+        }
+
+    raw_model = initialize_models(model_code)
+    pipe = create_preprocessing_pipeline(model=raw_model)
+    pipe.set_params(**params)
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    scores = cross_val_score(pipe, X, y, cv=cv, scoring='f1', n_jobs=-1)
+    return scores.mean()
+
+def hyperparameter_tuning(X_train, y_train):
+    # Specify which models to tune to avoid tuning all 6 from scratch
+    models_to_tune = {"Random Forest": "rf", "K-Nearest Neighbors": "knn", "XGBoost": "xgb"}
+    best_results_optuna = []
+    best_models_optuna = {}
+    print(f"Tuning model with Optuna...")
+
+    for model_name, model_code in models_to_tune.items():
+        print(f"Hyperparameter tuning for {model_name} using Optuna...")
+        study = optuna.create_study(direction='maximize') # Maximize F1
+        study.optimize(lambda trial: objective(trial, model_code, X_train, y_train), n_trials=10) # Reduced to 10 trials
+        
+        best_params = study.best_params
+        raw_model = initialize_models(model_code)
+        best_pipe = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=15)
+        best_pipe.set_params(**best_params)
+        best_pipe.fit(X_train, y_train)
+        
+        best_models_optuna[model_code] = {
+            'best_params': best_params,
+            'best_score': study.best_value,
+            'best_estimator': best_pipe,
+            'study': study
+        }
+        
+        result_entry = {
+            'Model Code': model_code,
+            'Model Name': model_name,
+            'Best F1': study.best_value,
+        }
+        best_results_optuna.append(result_entry)
+
+    df_best_model_optuna = pd.DataFrame(best_results_optuna).sort_values(
+        by="Best F1", ascending=False
+    ).reset_index(drop=True)
+
+    return df_best_model_optuna, best_models_optuna
+
+
 def train_final_models(X_train, y_train, top_model_names):
     """
     Rebuild the pipeline and fit it directly on the entire training set for exporting.
@@ -113,9 +186,8 @@ def train_final_models(X_train, y_train, top_model_names):
     for model_name in top_model_names:
         # Reverse lookup to get model_code
         model_code = next(code for code, name in models.items() if name == model_name)
-        
         raw_model = initialize_models(model_code)
-        pipeline = create_preprocessing_pipeline(model=raw_model)
+        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=15)
         
         logger.info(f"Fitting final pipeline for {model_name} on entire train set...")
         pipeline.fit(X_train, y_train)
