@@ -129,7 +129,7 @@ def split_data(df: pd.DataFrame, test_size: float = 0.2):
 def create_preprocessing_pipeline(
     model=None,
     contamination: float = 0.01,
-    sampling_strategy: float = 0.5,
+    sampling_strategy: str = 'auto',
     k_neighbors: int = 5
 ) -> Pipeline:
     """
