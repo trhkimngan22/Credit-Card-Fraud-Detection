@@ -8,6 +8,7 @@ from sklearn.ensemble import IsolationForest
 from feature_engine.outliers import Winsorizer
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,54 +18,55 @@ logger = logging.getLogger(__name__)
 RANDOM_STATE = 42
 
 
-class OutlierRemover(BaseEstimator, TransformerMixin):
+class OutlierRemover(BaseEstimator):
     """
-    Custom transformer wrapping IsolationForest to remove outliers.
+    Custom sampler wrapping IsolationForest to remove outliers from both X and y.
 
     Behavior:
-        - fit_transform() (training): remove outliers from X and save mask
-          to let imblearn Pipeline automatically synchronize y.
-        - transform() (predict/scoring): pass-through, DO NOT remove any sample.
-          Because when predicting, we need to keep all samples to evaluate.
+        - By implementing `fit_resample(X, y)`, imblearn Pipeline treats this as a Sampler.
+        - During training, it removes outliers from both X and y.
+        - During testing/prediction, imblearn Pipeline AUTOMATICALLY bypasses samplers,
+          so no test data is dropped.
     """
+    _estimator_type = "sampler"
 
     def __init__(self, n_estimators=200, contamination=0.01, random_state=RANDOM_STATE):
         self.n_estimators = n_estimators
         self.contamination = contamination
         self.random_state = random_state
 
-    def fit(self, X, y=None):
+    def fit_resample(self, X, y):
+        """
+        Remove outliers and return modified X and y so they remain synchronized.
+        """
         self.iso_forest_ = IsolationForest(
             n_estimators=self.n_estimators,
             contamination=self.contamination,
             random_state=self.random_state,
             n_jobs=-1
         )
-        self.iso_forest_.fit(X)
-        return self
-
-    def transform(self, X, y=None):
-        return X
-
-    def fit_transform(self, X, y=None):
-        """
-        Remove outliers only during training.
-        """
-        self.fit(X, y)
-        preds = self.iso_forest_.predict(X)
+        
+        # Fit IsolationForest and predict outliers in one step
+        preds = self.iso_forest_.fit_predict(X)
         mask = preds == 1  # 1 = inlier, -1 = outlier
 
+        # Filter X
         if isinstance(X, pd.DataFrame):
             X_filtered = X.loc[mask].reset_index(drop=True)
         else:
             X_filtered = X[mask]
 
+        # Filter y
+        if isinstance(y, (pd.Series, pd.DataFrame)):
+            y_filtered = y.loc[mask].reset_index(drop=True)
+        else:
+            y_filtered = y[mask]
+
         n_removed = (~mask).sum()
         if n_removed > 0:
             logger.info(f"OutlierRemover: removed {n_removed} outliers ({n_removed / len(X) * 100:.2f}%)")
 
-        self.mask_ = mask
-        return X_filtered
+        return X_filtered, y_filtered
 
     def get_feature_names_out(self, input_features=None):
         return input_features
