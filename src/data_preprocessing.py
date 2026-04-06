@@ -189,7 +189,9 @@ def preprocess_data(df: pd.DataFrame, test_size: float = 0.2):
     Returns:
         X_train, X_test, y_train, y_test
     """
+    # Remove duplicates
     df = remove_duplicated_data(df)
+    # Split data
     X_train, X_test, y_train, y_test = split_data(df, test_size=test_size)
     return X_train, X_test, y_train, y_test
 
@@ -209,13 +211,13 @@ def save_data(data, file_path: str) -> None:
 
 def main():
     """Main function."""
-    df = load_data("data/creditcard.csv")
+    df = load_data("../data/creditcard.csv")
     if df is not None:
         X_train, X_test, y_train, y_test = preprocess_data(df)
-        save_data(X_train, "data/X_train.csv")
-        save_data(X_test, "data/X_test.csv")
-        save_data(y_train, "data/y_train.csv")
-        save_data(y_test, "data/y_test.csv")
+        save_data(X_train, "../data/X_train.csv")
+        save_data(X_test, "../data/X_test.csv")
+        save_data(y_train, "../data/y_train.csv")
+        save_data(y_test, "../data/y_test.csv")
 
 
 if __name__ == "__main__":
