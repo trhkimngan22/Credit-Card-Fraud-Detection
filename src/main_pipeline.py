@@ -1,0 +1,52 @@
+import os
+import sys
+# Add project root to path so 'from src.xxx import yyy' works
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.model_training import train_all_models, select_top3_model, train_final_models, save_model
+import logging
+import pandas as pd
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+def main():
+    """Main execution block to run the complete training flow."""
+    logger.info("Starting model training pipeline...")
+    
+    # Paths for data and models
+    train_data_path = "../data/X_train.csv"
+    train_label_path = "../data/y_train.csv"
+    models_dir = "../models/"
+    
+    # Create models directory if it doesn't exist
+    os.makedirs(models_dir, exist_ok=True)
+    
+    # Load data
+    try:
+        logger.info("Loading training data...")
+        X_train = pd.read_csv(train_data_path)
+        y_train = pd.read_csv(train_label_path).squeeze()
+    except FileNotFoundError:
+        logger.error(f"Training data not found at {train_data_path}. Please run data_preprocessing.py first.")
+        return
+
+    # Phase 1: Train all models via CV
+    cv_results = train_all_models(X_train, y_train)
+
+    # Phase 2: Select top 3 models
+    top3_names = select_top3_model(cv_results)
+    print (cv_results)
+    print(top3_names)
+
+    # # Phase 3: Train final models on full dataset
+    # final_models = train_final_models(X_train, y_train, top3_names)
+
+    # # Phase 4: Save finalized models
+    # save_model(final_models, models_dir)
+    
+    # logger.info("Model training pipeline completed successfully!")
+
+if __name__ == "__main__":
+    main()
