@@ -11,6 +11,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def format_results(results):
+    formatted_list = []
+    import numpy as np
+    for model_name, cv_results in results.items():
+        formatted_list.append({
+            "Model": model_name,
+            "Accuracy": np.mean(cv_results["test_accuracy"]),
+            "Precision": np.mean(cv_results["test_precision"]),
+            "Recall": np.mean(cv_results["test_recall"]),
+            "F1-Score": np.mean(cv_results["test_f1"]),
+            "ROC-AUC": np.mean(cv_results["test_roc_auc"])
+        })
+
+    return pd.DataFrame(formatted_list)
+        
+
 def main():
     """Main execution block to run the complete training flow."""
     logger.info("Starting model training pipeline...")
@@ -37,8 +53,9 @@ def main():
 
     # Phase 2: Select top 3 models
     top3_names = select_top3_model(cv_results)
-    print (cv_results)
-    print(top3_names)
+    df_results = format_results(cv_results)
+    df_results = df_results.sort_values(by="F1-Score", ascending=False, ignore_index=True)
+    print(df_results)
 
     # # Phase 3: Train final models on full dataset
     # final_models = train_final_models(X_train, y_train, top3_names)
