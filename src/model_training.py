@@ -112,24 +112,26 @@ def objective(trial, model_code, X, y):
     
     if model_code == 'rf':
         params = {
-            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 300, step=100),
-            'model__max_depth': trial.suggest_categorical('model__max_depth', [5, 10, 15]),
+            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 400, step=100),
+            'model__max_depth': trial.suggest_categorical('model__max_depth', [10, 20, 30, None]),
             'model__min_samples_split': trial.suggest_int('model__min_samples_split', 2, 10),
+            'model__min_samples_leaf': trial.suggest_int('model__min_samples_leaf', 1, 4),
             'model__class_weight': trial.suggest_categorical('model__class_weight', ['balanced', None])
         }
     elif model_code == 'knn':
         params = {
-            'model__n_neighbors': trial.suggest_int('model__n_neighbors', 3, 15, step=2),
+            'model__n_neighbors': trial.suggest_int('model__n_neighbors', 3, 21, step=2),
             'model__weights': trial.suggest_categorical('model__weights', ['uniform', 'distance']),
-            'model__metric': trial.suggest_categorical('model__metric', ['euclidean', 'manhattan', 'cosine'])
+            'model__metric': trial.suggest_categorical('model__metric', ['euclidean', 'manhattan'])
         } 
     elif model_code == 'xgb':
         params = {
-            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 300, step=100),
-            'model__max_depth': trial.suggest_categorical('model__max_depth', [3, 5, 7]),
+            'model__n_estimators': trial.suggest_int('model__n_estimators', 150, 400, step=50),
+            'model__max_depth': trial.suggest_categorical('model__max_depth', [4, 6, 8]),
             'model__learning_rate': trial.suggest_float('model__learning_rate', 0.01, 0.2, log=True),
-            'model__subsample': trial.suggest_float('model__subsample', 0.7, 1.0),
-            'model__colsample_bytree': trial.suggest_float('model__colsample_bytree', 0.7, 1.0)
+            'model__subsample': trial.suggest_float('model__subsample', 0.6, 1.0),
+            'model__colsample_bytree': trial.suggest_float('model__colsample_bytree', 0.6, 1.0),
+            'model__gamma': trial.suggest_float('model__gamma', 0.0, 0.5)
         }
 
     raw_model = initialize_models(model_code)
@@ -139,9 +141,8 @@ def objective(trial, model_code, X, y):
     scores = cross_val_score(pipe, X, y, cv=cv, scoring='f1', n_jobs=-1)
     return scores.mean()
 
-def hyperparameter_tuning(X_train, y_train):
+def hyperparameter_tuning(X_train, y_train, models_to_tune):
     # Specify which models to tune to avoid tuning all 6 from scratch
-    models_to_tune = {"Random Forest": "rf", "K-Nearest Neighbors": "knn", "XGBoost": "xgb"}
     best_results_optuna = []
     best_models_optuna = {}
     print(f"Tuning model with Optuna...")
