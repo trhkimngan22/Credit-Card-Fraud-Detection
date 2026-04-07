@@ -2,7 +2,7 @@ import os
 import sys
 # Add project root to path so 'from src.xxx import yyy' works
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.model_training import train_all_models, select_top3_model, train_final_models, save_model
+from src.model_training import train_all_models, select_top3_model, train_final_models, save_model, hyperparameter_tuning
 import logging
 import pandas as pd
 
@@ -57,8 +57,12 @@ def main():
     df_results = df_results.sort_values(by="F1-Score", ascending=False, ignore_index=True)
     print(df_results)
 
-    # # Phase 3: Train final models on full dataset
-    # final_models = train_final_models(X_train, y_train, top3_names)
+    # Phase 3: Hyperparameters tuning
+    models_to_tune = {"Random Forest": "rf", "K-Nearest Neighbors": "knn", "XGBoost": "xgb"}
+    df_best_models, best_models_optuna = hyperparameter_tuning(X_train, y_train, models_to_tune)
+    print(df_best_models)
+    print(best_models_optuna)
+        
 
     # # Phase 4: Save finalized models
     # save_model(final_models, models_dir)
