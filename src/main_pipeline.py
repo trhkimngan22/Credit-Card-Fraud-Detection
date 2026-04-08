@@ -50,24 +50,23 @@ def main():
 
     # Phase 1: Train all models via CV
     cv_results = train_all_models(X_train, y_train)
-
-    # Phase 2: Select top 3 models
-    top3_names = select_top3_model(cv_results)
     df_results = format_results(cv_results)
     df_results = df_results.sort_values(by="F1-Score", ascending=False, ignore_index=True)
     print(df_results)
 
+    # Phase 2: Select top 3 models
+    top3_names = select_top3_model(cv_results)
+
     # Phase 3: Hyperparameters tuning
-    models_to_tune = {"Random Forest": "rf", "K-Nearest Neighbors": "knn", "XGBoost": "xgb"}
+    models_to_tune = {"Random Forest": "rf", "XGBoost": "xgb", "LightGBM": "lgb"}
     df_best_models, best_models_optuna = hyperparameter_tuning(X_train, y_train, models_to_tune)
     print(df_best_models)
     print(best_models_optuna)
-        
 
-    # # Phase 4: Save finalized models
-    # save_model(final_models, models_dir)
+    # Phase 4: Save finalized models
+    save_model(best_models_optuna, models_dir)
     
-    # logger.info("Model training pipeline completed successfully!")
+    logger.info("Model training pipeline completed successfully!")
 
 if __name__ == "__main__":
     main()
