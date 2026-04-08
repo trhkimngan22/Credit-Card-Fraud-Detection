@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import logging
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import IsolationForest
@@ -161,7 +161,7 @@ def create_preprocessing_pipeline(
     """
     steps = [
         ("capper", Winsorizer(capping_method='iqr', tail='both', fold=1.5)),
-        ("scaler", StandardScaler()),
+        ("scaler", RobustScaler()),
         ("outlier_remover", OutlierRemover(
             n_estimators=200,
             contamination=contamination,
