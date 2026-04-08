@@ -6,6 +6,10 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import cross_validate, StratifiedKFold, cross_val_score
+from sklearn.ensemble import StackingClassifier
+from sklearn.base import clone
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
 from xgboost import XGBClassifier
 import lightgbm as lgb
 import joblib
@@ -51,6 +55,15 @@ def initialize_models(model_code: str):
         logger.error(f"Invalid model code: {model_code}")
         return None
 
+def print_evaluate (model_name, accuracy, recall, precision, f1, roc_auc):
+    logger.info(f"Evaluation for {model_name} completed")
+    logger.info(f"Results for {model_name}:")
+    logger.info(f"Accuracy:  {accuracy:.4f}")
+    logger.info(f"Recall:    {recall:.4f}")
+    logger.info(f"Precision: {precision:.4f}")
+    logger.info(f"F1-score:  {f1:.4f}")
+    logger.info(f"ROC-AUC:   {roc_auc:.4f}")
+
 def train_model(pipeline, X_train, y_train):
     """
     Evaluate modeling pipeline using cross-validation.
@@ -80,13 +93,7 @@ def train_all_models(X_train, y_train):
         try:
             cv_results = train_model(pipeline, X_train, y_train)
             results[model_name] = cv_results
-            logger.info(f"Evaluation for {model_name} completed")
-            logger.info(f"Results for {model_name}:")
-            logger.info(f"  Accuracy: {np.mean(cv_results['test_accuracy']):.4f} (+/- {np.std(cv_results['test_accuracy']):.4f})")
-            logger.info(f"  Recall: {np.mean(cv_results['test_recall']):.4f} (+/- {np.std(cv_results['test_recall']):.4f})")
-            logger.info(f"  Precision: {np.mean(cv_results['test_precision']):.4f} (+/- {np.std(cv_results['test_precision']):.4f})")
-            logger.info(f"  F1-score: {np.mean(cv_results['test_f1']):.4f} (+/- {np.std(cv_results['test_f1']):.4f})")
-            logger.info(f"  ROC-AUC: {np.mean(cv_results['test_roc_auc']):.4f} (+/- {np.std(cv_results['test_roc_auc']):.4f})")
+            print_evaluate(model_name, np.mean(cv_results['test_accuracy']), np.mean(cv_results['test_recall']), np.mean(cv_results['test_precision']), np.mean(cv_results['test_f1']), np.mean(cv_results['test_roc_auc']))
         except Exception as e:
             logger.error(f"Error training {model_name}: {e}")
     return results
@@ -201,6 +208,53 @@ def train_final_models(X_train, y_train, top_model_names):
         
     return fitted_models
 
+def ensemble_models(models_dict, X_train, y_train):
+    """
+    Extract tuned base models from Pipeline, combine them into a StackingClassifier, and train.
+    """
+    logger.info("Building and Training Stacking Ensemble Model...")
+    estimators = []
+    
+    # Extract tuned base models
+    for model_name, result in models_dict.items():
+        pipeline = result['best_estimator'] if isinstance(result, dict) and 'best_estimator' in result else result
+        tuned_model = pipeline.named_steps['model']
+        estimators.append((model_name, tuned_model))
+        
+    # Build Stacking Classifier using LogisticRegression as Meta-model
+    stacking_clf = StackingClassifier(
+        estimators=estimators, 
+        final_estimator=LogisticRegression(random_state=RANDOM_STATE), 
+        cv=5, 
+        n_jobs=-1
+    )
+    
+    # Get clone from Pipeline
+    base_pipeline = list(models_dict.values())[0]
+    base_pipeline = base_pipeline['best_estimator'] if isinstance(base_pipeline, dict) and 'best_estimator' in base_pipeline else base_pipeline
+    
+    ensemble_pipe = clone(base_pipeline)
+    ensemble_pipe.steps[-1] = ('model', stacking_clf)
+    logger.info("Fitting Stacking Pipeline...")
+    ensemble_pipe.fit(X_train, y_train)
+    
+    # Add ensemble model to models_dict
+    models_dict['ensemble'] = {
+        'best_estimator': ensemble_pipe
+    }
+
+    # Evaluate on training set
+    y_pred = ensemble_pipe.predict(X_train)
+    y_proba = ensemble_pipe.predict_proba(X_train)[:, 1]
+    accuracy = accuracy_score(y_train, y_pred)
+    recall = recall_score(y_train, y_pred)
+    precision = precision_score(y_train, y_pred)
+    f1 = f1_score(y_train, y_pred)
+    roc_auc = roc_auc_score(y_train, y_proba)
+    print_evaluate("Stacking Ensemble", accuracy, recall, precision, f1, roc_auc)
+
+    return models_dict
+
 def save_model(models_dict, file_path):
     """
     Save trained model pipelines to file.
@@ -210,8 +264,9 @@ def save_model(models_dict, file_path):
     if not file_path.endswith('/') and not file_path.endswith('_'):
         file_path += "_"
         
-    for model_name, pipeline in models_dict.items():
+    for model_name, result in models_dict.items():
         try:
+            pipeline = result['best_estimator'] if isinstance(result, dict) and 'best_estimator' in result else result
             safe_name = model_name.replace(" ", "_").lower()
             full_path = file_path + safe_name + ".pkl"
             joblib.dump(pipeline, full_path)
