@@ -122,12 +122,6 @@ def objective(trial, model_code, X, y):
             'model__min_samples_leaf': trial.suggest_int('model__min_samples_leaf', 1, 4),
             'model__class_weight': trial.suggest_categorical('model__class_weight', ['balanced', None])
         }
-    elif model_code == 'knn':
-        params = {
-            'model__n_neighbors': trial.suggest_int('model__n_neighbors', 3, 21, step=2),
-            'model__weights': trial.suggest_categorical('model__weights', ['uniform', 'distance']),
-            'model__metric': trial.suggest_categorical('model__metric', ['euclidean', 'manhattan'])
-        } 
     elif model_code == 'xgb':
         params = {
             'model__n_estimators': trial.suggest_int('model__n_estimators', 150, 400, step=50),
