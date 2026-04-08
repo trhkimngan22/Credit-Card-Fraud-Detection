@@ -7,6 +7,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import cross_validate, StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
+import lightgbm as lgb
 import joblib
 # Import custom preprocessing pipeline wrapper
 from src.data_preprocessing import create_preprocessing_pipeline
@@ -22,6 +23,7 @@ models = {
     "rf": "Random Forest",
     "gb": "Gradient Boosting",
     "xgb": "XGBoost",
+    "lgb": "LightGBM",
     "knn": "K-Nearest Neighbors",
     "svm": "Support Vector Machine",
     "gnb": "Gaussian Naive Bayes"
@@ -37,6 +39,8 @@ def initialize_models(model_code: str):
         return GradientBoostingClassifier(random_state=RANDOM_STATE)
     elif model_code == "xgb":
         return XGBClassifier(random_state=RANDOM_STATE)
+    elif model_code == "lgb":
+        return lgb.LGBMClassifier(random_state=RANDOM_STATE, min_data_in_leaf=20, min_gain_to_split=0.0, verbose=-1)
     elif model_code == "knn":
         return KNeighborsClassifier()
     elif model_code == "svm":
@@ -133,6 +137,12 @@ def objective(trial, model_code, X, y):
             'model__colsample_bytree': trial.suggest_float('model__colsample_bytree', 0.6, 1.0),
             'model__gamma': trial.suggest_float('model__gamma', 0.0, 0.5)
         }
+    elif model_code == 'lgb':
+        params = {
+            'model__n_estimators': trial.suggest_int('model__n_estimators', 100, 300, step=100),
+            'model__num_leaves': trial.suggest_categorical('model__num_leaves', [31, 50, 70]),
+            'model__learning_rate': trial.suggest_float('model__learning_rate', 0.01, 0.2, log=True),
+        }
 
     raw_model = initialize_models(model_code)
     pipe = create_preprocessing_pipeline(model=raw_model)
@@ -154,7 +164,7 @@ def hyperparameter_tuning(X_train, y_train, models_to_tune):
         
         best_params = study.best_params
         raw_model = initialize_models(model_code)
-        best_pipe = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=15)
+        best_pipe = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
         best_pipe.set_params(**best_params)
         best_pipe.fit(X_train, y_train)
         
@@ -188,7 +198,7 @@ def train_final_models(X_train, y_train, top_model_names):
         # Reverse lookup to get model_code
         model_code = next(code for code, name in models.items() if name == model_name)
         raw_model = initialize_models(model_code)
-        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=15)
+        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
         
         logger.info(f"Fitting final pipeline for {model_name} on entire train set...")
         pipeline.fit(X_train, y_train)
