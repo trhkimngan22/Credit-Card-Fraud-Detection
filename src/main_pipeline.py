@@ -2,7 +2,7 @@ import os
 import sys
 # Add project root to path so 'from src.xxx import yyy' works
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.model_training import train_all_models, select_top3_model, train_final_models, save_model, hyperparameter_tuning
+from src.model_training import train_all_models, select_top3_model, train_final_models, save_model, hyperparameter_tuning, ensemble_models
 import logging
 import pandas as pd
 
@@ -52,7 +52,7 @@ def main():
     cv_results = train_all_models(X_train, y_train)
     df_results = format_results(cv_results)
     df_results = df_results.sort_values(by="F1-Score", ascending=False, ignore_index=True)
-    print(df_results)
+    logger.info(df_results)
 
     # Phase 2: Select top 3 models
     top3_names = select_top3_model(cv_results)
@@ -60,11 +60,14 @@ def main():
     # Phase 3: Hyperparameters tuning
     models_to_tune = {"Random Forest": "rf", "XGBoost": "xgb", "LightGBM": "lgb"}
     df_best_models, best_models_optuna = hyperparameter_tuning(X_train, y_train, models_to_tune)
-    print(df_best_models)
-    print(best_models_optuna)
+    logger.info(df_best_models)
+    logger.info(best_models_optuna)
 
-    # Phase 4: Save finalized models
-    save_model(best_models_optuna, models_dir)
+    # Phase 4: Build Ensemble from Tuned Models
+    models_dict = ensemble_models(best_models_optuna, X_train, y_train)
+
+    # Phase 5: Save finalized models
+    save_model(models_dict, models_dir)
     
     logger.info("Model training pipeline completed successfully!")
 
