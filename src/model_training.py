@@ -111,10 +111,10 @@ def select_top3_model(results):
     top3_models = model_scores[:3]
     
     logger.info("Top 3 models:")
-    top3_names = []
+    top3_names = {}
     for rank, (model_name, score) in enumerate(top3_models, start=1):
         logger.info(f"  {rank}. {model_name} with F1-score: {score:.4f}")
-        top3_names.append(model_name)
+        top3_names[model_name] = [k for k, v in models.items() if v == model_name][0]
         
     return top3_names
 
