@@ -58,7 +58,7 @@ def main():
     top3_names = select_top3_model(cv_results)
 
     # Phase 3: Hyperparameters tuning
-    models_to_tune = {"Random Forest": "rf", "XGBoost": "xgb", "LightGBM": "lgb"}
+    models_to_tune = top3_names
     df_best_models, best_models_optuna = hyperparameter_tuning(X_train, y_train, models_to_tune)
     logger.info(df_best_models)
     logger.info(best_models_optuna)
