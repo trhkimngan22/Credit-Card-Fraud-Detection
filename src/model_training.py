@@ -17,11 +17,15 @@ import joblib
 from src.data_preprocessing import create_preprocessing_pipeline
 import optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
+from src.utils import setup_logger, load_config
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+config = load_config()
+logger = setup_logger(__name__)
 
-RANDOM_STATE = 42
+RANDOM_STATE = config['training']['random_state']
+CV_SPLITS = config['training']['cv_splits']
+CONTAMINATION = config['training']['contamination']
+SMOTE_K_NEIGHBORS = config['training']['smote_k_neighbors']
 
 models = {
     "rf": "Random Forest",
@@ -68,7 +72,7 @@ def train_model(pipeline, X_train, y_train):
     """
     Evaluate modeling pipeline using cross-validation.
     """
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv = StratifiedKFold(n_splits=CV_SPLITS, shuffle=True, random_state=RANDOM_STATE)
     results = cross_validate(
         pipeline, X_train, y_train, cv=cv,
         scoring=['accuracy', 'recall', 'precision', 'f1', 'roc_auc'],
@@ -88,7 +92,7 @@ def train_all_models(X_train, y_train):
             continue
             
         # Wrap the model in our data preprocessing steps
-        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
+        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=CONTAMINATION, k_neighbors=SMOTE_K_NEIGHBORS)
         
         try:
             cv_results = train_model(pipeline, X_train, y_train)
@@ -148,7 +152,7 @@ def objective(trial, model_code, X, y):
     raw_model = initialize_models(model_code)
     pipe = create_preprocessing_pipeline(model=raw_model)
     pipe.set_params(**params)
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv = StratifiedKFold(n_splits=CV_SPLITS, shuffle=True, random_state=RANDOM_STATE)
     scores = cross_val_score(pipe, X, y, cv=cv, scoring='f1', n_jobs=-1)
     return scores.mean()
 
@@ -165,7 +169,7 @@ def hyperparameter_tuning(X_train, y_train, models_to_tune):
         
         best_params = study.best_params
         raw_model = initialize_models(model_code)
-        best_pipe = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
+        best_pipe = create_preprocessing_pipeline(model=raw_model, contamination=CONTAMINATION, k_neighbors=SMOTE_K_NEIGHBORS)
         best_pipe.set_params(**best_params)
         best_pipe.fit(X_train, y_train)
         
@@ -196,10 +200,9 @@ def train_final_models(X_train, y_train, top_model_names):
     """
     fitted_models = {}
     for model_name in top_model_names:
-        # Reverse lookup to get model_code
         model_code = next(code for code, name in models.items() if name == model_name)
         raw_model = initialize_models(model_code)
-        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=0.01, k_neighbors=5)
+        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=CONTAMINATION, k_neighbors=SMOTE_K_NEIGHBORS)
         
         logger.info(f"Fitting final pipeline for {model_name} on entire train set...")
         pipeline.fit(X_train, y_train)
@@ -221,11 +224,10 @@ def ensemble_models(models_dict, X_train, y_train):
         tuned_model = pipeline.named_steps['model']
         estimators.append((model_name, tuned_model))
         
-    # Build Stacking Classifier using LogisticRegression as Meta-model
     stacking_clf = StackingClassifier(
         estimators=estimators, 
         final_estimator=LogisticRegression(random_state=RANDOM_STATE), 
-        cv=5, 
+        cv=CV_SPLITS, 
         n_jobs=-1
     )
     

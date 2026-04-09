@@ -5,12 +5,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.model_training import train_all_models, select_top3_model, train_final_models, save_model, hyperparameter_tuning, ensemble_models
 import logging
 import pandas as pd
+from src.utils import setup_logger, load_config, ROOT_DIR
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
+logger = setup_logger(__name__)
+config = load_config()
 def format_results(results):
     formatted_list = []
     import numpy as np
@@ -32,9 +30,9 @@ def main():
     logger.info("Starting model training pipeline...")
     
     # Paths for data and models
-    train_data_path = "../data/X_train.csv"
-    train_label_path = "../data/y_train.csv"
-    models_dir = "../models/"
+    train_data_path = os.path.join(ROOT_DIR, config['paths']['train_data'])
+    train_label_path = os.path.join(ROOT_DIR, config['paths']['train_label'])
+    models_dir = os.path.join(ROOT_DIR, config['paths']['models_dir'])
     
     # Create models directory if it doesn't exist
     os.makedirs(models_dir, exist_ok=True)

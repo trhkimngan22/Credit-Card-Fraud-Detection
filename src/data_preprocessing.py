@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import logging
 from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -9,13 +8,17 @@ from feature_engine.outliers import Winsorizer
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline
 import os
+from src.utils import setup_logger, load_config
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logging using utils
+logger = setup_logger(__name__)
 
-# Define random_state
-RANDOM_STATE = 42
+# Load config
+config = load_config()
+RANDOM_STATE = config['training']['random_state']
+TEST_SIZE = config['training']['test_size']
+CONTAMINATION = config['training']['contamination']
+SMOTE_K_NEIGHBORS = config['training']['smote_k_neighbors']
 
 
 class OutlierRemover(BaseEstimator):
@@ -99,7 +102,7 @@ def remove_duplicated_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def split_data(df: pd.DataFrame, test_size: float = 0.2):
+def split_data(df: pd.DataFrame, test_size: float = TEST_SIZE):
     """
     Split data into training and hold-out test sets.
 
@@ -128,9 +131,9 @@ def split_data(df: pd.DataFrame, test_size: float = 0.2):
 
 def create_preprocessing_pipeline(
     model=None,
-    contamination: float = 0.01,
+    contamination: float = CONTAMINATION,
     sampling_strategy: str = 'auto',
-    k_neighbors: int = 5
+    k_neighbors: int = SMOTE_K_NEIGHBORS
 ) -> Pipeline:
     """
     Create an imblearn Pipeline with preprocessing steps and optionally a model.
@@ -180,7 +183,7 @@ def create_preprocessing_pipeline(
     return Pipeline(steps)
 
 
-def preprocess_data(df: pd.DataFrame, test_size: float = 0.2):
+def preprocess_data(df: pd.DataFrame, test_size: float = TEST_SIZE):
     """
     Preprocess data: remove duplicates and split into train/test.
 
@@ -213,13 +216,18 @@ def save_data(data, file_path: str) -> None:
 
 def main():
     """Main function."""
-    df = load_data("../data/creditcard.csv")
+    # Root directory path logic is wrapped inside utils, but considering data_preprocessing.py is run directly, 
+    # we need the absolute path from the ROOT_DIR
+    from src.utils import ROOT_DIR
+    
+    raw_path = os.path.join(ROOT_DIR, config['paths']['raw_data'])
+    df = load_data(raw_path)
     if df is not None:
         X_train, X_test, y_train, y_test = preprocess_data(df)
-        save_data(X_train, "../data/X_train.csv")
-        save_data(X_test, "../data/X_test.csv")
-        save_data(y_train, "../data/y_train.csv")
-        save_data(y_test, "../data/y_test.csv")
+        save_data(X_train, os.path.join(ROOT_DIR, config['paths']['train_data']))
+        save_data(X_test, os.path.join(ROOT_DIR, config['paths']['test_data']))
+        save_data(y_train, os.path.join(ROOT_DIR, config['paths']['train_label']))
+        save_data(y_test, os.path.join(ROOT_DIR, config['paths']['test_label']))
 
 
 if __name__ == "__main__":

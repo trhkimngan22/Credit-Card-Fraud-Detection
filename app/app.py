@@ -5,8 +5,11 @@ import joblib
 import os
 import time
 import sys
+import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.utils import load_config, ROOT_DIR
+config = load_config()
 
 # Configuration
 st.set_page_config(page_title="Credit Card Fraud Detection Prototype", page_icon="💳", layout="wide")
@@ -40,7 +43,7 @@ div.stButton > button:first-child {
 
 @st.cache_resource
 def load_models():
-    models_dir = '../models'
+    models_dir = os.path.join(ROOT_DIR, config['paths']['models_dir'])
     if not os.path.exists(models_dir):
         st.error(f"No models found in {models_dir}. Please run main_pipeline.py first.")
         return {}
@@ -71,11 +74,13 @@ def load_models():
 
 @st.cache_data
 def load_test_data():
-    if not os.path.exists('../data/X_test.csv'):
-        st.error("No test data found. Please run data_preprocessing.py first.")
+    test_data_path = os.path.join(ROOT_DIR, config['paths']['test_data'])
+    test_label_path = os.path.join(ROOT_DIR, config['paths']['test_label'])
+    if not os.path.exists(test_data_path):
+        st.error(f"No test data found at {test_data_path}. Please run data_preprocessing.py first.")
         return None, None
-    X_test = pd.read_csv('../data/X_test.csv')
-    y_test = pd.read_csv('../data/y_test.csv')
+    X_test = pd.read_csv(test_data_path)
+    y_test = pd.read_csv(test_label_path)
     return X_test, y_test
 
 
