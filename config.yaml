@@ -1,0 +1,16 @@
+paths:
+  raw_data: "data/creditcard.csv"
+  train_data: "data/X_train.csv"
+  train_label: "data/y_train.csv"
+  test_data: "data/X_test.csv"
+  test_label: "data/y_test.csv"
+  models_dir: "models/"
+  reports_dir: "reports/figures/"
+  log_file: "logs/pipeline.log"
+
+training:
+  random_state: 42
+  test_size: 0.2
+  cv_splits: 5
+  contamination: 0.01
+  smote_k_neighbors: 5
