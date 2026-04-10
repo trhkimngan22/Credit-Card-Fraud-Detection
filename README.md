@@ -42,11 +42,10 @@ Credit-Card-Fraud-Detection/
 │   ├── data_preprocessing.py       # Data preprocessing
 │   ├── model_training.py           # Model training and evaluation
 │   ├── main_pipeline.py            # Main pipeline
-│   └── predict.py                  # Prediction module for new data
+│   ├── predict.py                  # Prediction module for new data
+│   └── utils.py                    # Utility functions
 ├── app/                            # Streamlit web application
-│   ├── app.py            # Main Streamlit app
-│   ├── README.md                   # App documentation
-│   └── TROUBLESHOOTING.md          # App troubleshooting guide
+│   └── app.py            # Main Streamlit app
 ├── models/     
 │   └── *.pkl                       # Saved 4 models including ensemble model and top 3 models
 │                                   # according to F1 score
@@ -54,8 +53,6 @@ Credit-Card-Fraud-Detection/
 │   └── pipeline.log                # Pipeline log file
 ├── notebooks/                      # Jupyter notebooks for EDA
 │   └── eda.ipynb
-├── tests/                          # Unit tests
-│   └── test.py
 ├── reports/
 │   ├── figures/                # Figures for evaluation
 │   │   └── *.png                       # Figures for evaluation including confusion matrix, ROC curve.
@@ -117,7 +114,3 @@ This will:
 ```bash
 streamlit run app/app.py
 ```
-
-## License
-
-This project is licensed under the MIT License.
