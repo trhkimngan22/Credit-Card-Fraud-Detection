@@ -2,8 +2,7 @@ import os
 import sys
 # Add project root to path so 'from src.xxx import yyy' works
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.model_training import train_all_models, select_top3_model, train_final_models, save_model, hyperparameter_tuning, ensemble_models
-import logging
+from src.model_training import train_all_models, select_top3_model, save_model, hyperparameter_tuning, ensemble_models
 import pandas as pd
 from src.utils import setup_logger, load_config, ROOT_DIR
 

@@ -194,23 +194,6 @@ def hyperparameter_tuning(X_train, y_train, models_to_tune):
     return df_best_model_optuna, best_models_optuna
 
 
-def train_final_models(X_train, y_train, top_model_names):
-    """
-    Rebuild the pipeline and fit it directly on the entire training set for exporting.
-    """
-    fitted_models = {}
-    for model_name in top_model_names:
-        model_code = next(code for code, name in models.items() if name == model_name)
-        raw_model = initialize_models(model_code)
-        pipeline = create_preprocessing_pipeline(model=raw_model, contamination=CONTAMINATION, k_neighbors=SMOTE_K_NEIGHBORS)
-        
-        logger.info(f"Fitting final pipeline for {model_name} on entire train set...")
-        pipeline.fit(X_train, y_train)
-        
-        fitted_models[model_name] = pipeline
-        
-    return fitted_models
-
 def ensemble_models(models_dict, X_train, y_train):
     """
     Extract tuned base models from Pipeline, combine them into a StackingClassifier, and train.
@@ -260,7 +243,6 @@ def ensemble_models(models_dict, X_train, y_train):
 def save_model(models_dict, file_path):
     """
     Save trained model pipelines to file.
-    models_dict is typically the output of train_final_models().
     """
     # Ensure there's a trailing slash or separator if file_path is meant to be a prefix
     if not file_path.endswith('/') and not file_path.endswith('_'):

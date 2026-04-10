@@ -1,1 +1,25 @@
+# Virtual environment
 /train_env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Models (large .pkl files)
+models/*.pkl
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/*.log
+
+# Jupyter
+.ipynb_checkpoints/

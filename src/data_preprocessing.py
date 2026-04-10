@@ -140,7 +140,7 @@ def create_preprocessing_pipeline(
 
     Pipeline steps:
         1. Winsorizer  — cap extreme values (1st & 99th percentile)
-        2. StandardScaler — normalize features
+        2. RobustScaler — normalize features
         3. OutlierRemover — remove outliers via IsolationForest (custom transformer)
         4. SMOTE — oversample minority class
         5. Model
