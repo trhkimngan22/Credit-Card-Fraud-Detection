@@ -3,7 +3,7 @@
 ## Project Overview
 A credit card fraud detection system using machine learning models to detect fraudulent transactions and prevent financial loss.
 - Size: 284,807 transactions.
-- Features: 30 features (28 PCA-transformed features, 'Amount', 'Class').
+- Features: 31 features (28 PCA-transformed features, 'Amount', 'Time', 'Class').
 - Class distribution: ~0.2% fraudulent transactions.
 - Model trained: 7 algorithms (Random Forest, Gradient Boosting, XGBoost, LightGBM, K-Nearest Neighbors, Support Vector Machine, Gaussian Naive Bayes).
 - Best performance on test set: Ensemble model with ~74% F1-score.
@@ -14,7 +14,7 @@ A credit card fraud detection system using machine learning models to detect fra
 - Removed duplicated transactions.
 - 80/20 train/test split.
 - Capped extreme values using Winsorizer method.
-- StandardScaler for numerical features.
+- RobustScaler for numerical features.
 - Removed outliers using IsolationForest.
 - Applied SMOTE to oversample the minority class.
 
