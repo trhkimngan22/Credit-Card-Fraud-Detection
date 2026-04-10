@@ -2,24 +2,21 @@
 /train_env
 
 # Python
-__pycache__/
+/__pycache__/
 *.pyc
 *.pyo
 *.egg-info/
 .eggs/
 
-# Models (large .pkl files)
-models/*.pkl
-
 # OS files
-.DS_Store
+/.DS_Store
 
 # IDE
-.vscode/
-.idea/
+/.vscode/
+/.idea/
 
 # Logs
-logs/*.log
+/logs/*.log
 
 # Jupyter
-.ipynb_checkpoints/
+/.ipynb_checkpoints/
