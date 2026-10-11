@@ -6,6 +6,7 @@ paths:
   test_label: "data/y_test.csv"
   models_dir: "models/"
   reports_dir: "reports/figures/"
+  business_dir: "reports/business/"
   log_file: "logs/pipeline.log"
 
 training:
@@ -13,4 +14,9 @@ training:
   test_size: 0.2
   cv_splits: 5
   contamination: 0.01
+  outlier_majority_only: true   # IsolationForest only removes Class = 0 rows (fraud is never dropped)
   smote_k_neighbors: 5
+
+business:
+  thresholds: [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  false_positive_cost: 5   # assumed cost (same currency as Amount) of wrongly blocking a genuine transaction
