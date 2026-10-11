@@ -6,7 +6,7 @@ A credit card fraud detection system using machine learning models to detect fra
 - Features: 31 features (28 PCA-transformed features, 'Amount', 'Time', 'Class').
 - Class distribution: ~0.2% fraudulent transactions.
 - Model trained: 7 algorithms (Random Forest, Gradient Boosting, XGBoost, LightGBM, K-Nearest Neighbors, Support Vector Machine, Gaussian Naive Bayes).
-- Best performance on test set: Ensemble model with ~74% F1-score.
+- Best performance on test set: Ensemble model with 80% F1-score (Random Forest ~81%).
 
 ## Deliverables Created
 ### 1. Data Preprocessing Module (`src/data_preprocessing.py`)
@@ -15,7 +15,7 @@ A credit card fraud detection system using machine learning models to detect fra
 - 80/20 train/test split.
 - Capped extreme values using Winsorizer method.
 - RobustScaler for numerical features.
-- Removed outliers using IsolationForest.
+- Removed outliers of the normal class (Class = 0) using IsolationForest. Note: fraud rows are never dropped.
 - Applied SMOTE to oversample the minority class.
 
 ### 2. Model Training Module (`src/model_training.py`)
@@ -42,7 +42,11 @@ Data preprocessing -> Model training -> Model evaluation -> Model selection -> H
 - Predict fraud or normal transactions.
 - Save performance prediction figures to `reports/figures/` directory.
 
-### 5. Streamlit Application (`app/app.py`)
+### 5. Business Analysis Module (`src/business_analysis.py`)
+- Fraud amount caught / missed (`Amount` column) and genuine customers blocked for thresholds 0.05 – 0.9.
+- Saves tables to `reports/business/` and trade-off charts to `reports/figures/`.
+
+### 6. Streamlit Application (`app/app.py`)
 - Interactive web application to test the trained models.
 - Allows users to select a model and test it on random, fraud, or normal transactions.
 - Displays transaction information and model predictions.
@@ -53,23 +57,23 @@ Data preprocessing -> Model training -> Model evaluation -> Model selection -> H
 
 | Model | Accuracy | Recall | Precision | F1-Score | ROC-AUC |
 |-------|----------|--------|-----------|----------|---------|
-| **Ensemble (Stacking)** | **0.9992** | **0.6947** | **0.7952** | **0.7416** | **0.9618** |
-| XGBoost | 0.9991 | 0.7368 | 0.7216 | 0.7292 | 0.9617 |
-| LightGBM | 0.9991 | 0.6842 | 0.7647 | 0.7222 | 0.9631 |
-| Random Forest | 0.9989 | 0.5263 | 0.7353 | 0.6135 | 0.9578 |
+| **Ensemble (Stacking)** | **0.9993** | **0.8000** | **0.8000** | **0.8000** | **0.9749** |
+| Random Forest | 0.9994 | 0.7789 | 0.8409 | 0.8087 | 0.9652 |
+| XGBoost | 0.9992 | 0.7895 | 0.7426 | 0.7653 | 0.9755 |
+| LightGBM | 0.9993 | 0.7789 | 0.7957 | 0.7872 | 0.9680 |
 
 ### Selected Model: Stacking Ensemble
-The Ensemble model was selected as the final production model because:
-- **Highest F1-score (0.7416):** Best balance between Precision and Recall across all models.
-- **Highest Precision (0.7952):** ~80% of fraud alerts are correct, minimizing false alarms that inconvenience legitimate customers.
-- **Strong Recall (0.6947):** Captures ~70% of actual fraud cases.
-- **Top-tier ROC-AUC (0.9618):** Demonstrates excellent class separation ability.
+The Ensemble model is selected as the production model because:
+- **Robust to the threshold:** It catches the same 76 of 95 frauds for any threshold from 0.05 to 0.8, with only 17–25 false alarms.
+- **Balanced Precision / Recall (0.80 / 0.80):** Catches 80% of frauds and 80% of alerts are correct.
+- **High ROC-AUC (0.9749):** Close to the best single model (XGBoost, 0.9755).
+- Random Forest has a slightly higher F1 at 0.5 (0.8087), but its performance swings much more when the threshold changes.
 
 ### Key Observations
 1. **Accuracy is misleading in this context:** All models achieve >99.9% accuracy simply because the dataset is 99.8% non-fraud. F1-score is the correct metric to evaluate performance on the minority (fraud) class.
-2. **XGBoost has the highest Recall (0.7368)** but at the cost of lower Precision (0.7216), meaning more false alarms.
-3. **Random Forest underperforms significantly** with only 52.6% Recall — nearly half of all fraud cases are missed.
-4. **The Stacking Ensemble combines the strengths** of XGBoost (high Recall) and LightGBM (high Precision) through a LogisticRegression meta-learner, resulting in the most balanced and robust predictions.
+2. **XGBoost has the lowest Precision (0.7426)** of the final models, meaning more false alarms (26 at threshold 0.5).
+3. **Outlier removal must not touch the minority class:** Running IsolationForest on all rows removed 64% of training frauds; restricting it to Class = 0 raised Random Forest Recall from 0.53 to 0.78.
+4. **The threshold is a business decision:** For Random Forest, lowering it from 0.5 to 0.05 catches 90% instead of 74% of the fraud amount but blocks 666 instead of 14 genuine customers.
 
 ## Technical Architecture
 
@@ -86,7 +90,7 @@ Raw CSV (284,807 rows)
 X_train fold
   → Winsorizer (cap extreme values, IQR method)
   → RobustScaler (standardize features)
-  → OutlierRemover (IsolationForest, contamination=1%)
+  → OutlierRemover (IsolationForest on Class = 0 only, contamination=1%)
   → SMOTE (oversample minority class)
   → Classifier (RF / XGB / LGB / etc.)
 ```
@@ -105,7 +109,8 @@ Saved .pkl model
 1. **Data leakage prevention is critical:** Wrapping all preprocessing (scaling, outlier removal, SMOTE) inside the `imblearn.Pipeline` ensures that test data is never used during training transformations.
 2. **SMOTE is only applied during training:** The `imblearn.Pipeline` automatically bypasses samplers (OutlierRemover, SMOTE) during `predict()` calls, ensuring test data integrity.
 3. **Ensemble methods provide stability:** While individual models may excel in one metric (e.g., XGBoost in Recall), the Stacking Ensemble delivers the most consistent and balanced performance.
-4. **F1-score is the right metric:** For highly imbalanced datasets like credit card fraud (~0.2% positive class), accuracy is misleading. F1-score properly captures the trade-off between catching fraud (Recall) and avoiding false alarms (Precision).
+4. **Anomaly-based cleaning can delete the target:** In fraud detection the positive class *is* the anomaly, so outlier removal has to be restricted to the majority class (and its effect on the minority class should always be checked).
+5. **F1-score is the right metric:** For highly imbalanced datasets like credit card fraud (~0.2% positive class), accuracy is misleading. F1-score properly captures the trade-off between catching fraud (Recall) and avoiding false alarms (Precision).
 
 ## Future Improvements
 - **Feature engineering:** Create behavioral features (e.g., rolling transaction statistics, time-based patterns) to potentially push F1 above 0.80.
