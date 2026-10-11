@@ -18,6 +18,7 @@ config = load_config()
 RANDOM_STATE = config['training']['random_state']
 TEST_SIZE = config['training']['test_size']
 CONTAMINATION = config['training']['contamination']
+OUTLIER_MAJORITY_ONLY = config['training'].get('outlier_majority_only', True)
 SMOTE_K_NEIGHBORS = config['training']['smote_k_neighbors']
 
 
@@ -30,12 +31,15 @@ class OutlierRemover(BaseEstimator):
         - During training, it removes outliers from both X and y.
         - During testing/prediction, imblearn Pipeline AUTOMATICALLY bypasses samplers,
           so no test data is dropped.
+        - With `majority_only=True` (default), IsolationForest is fitted on and removes
+          rows of the majority class (Class = 0) only.
     """
     _estimator_type = "sampler"
 
-    def __init__(self, n_estimators=200, contamination=0.01, random_state=RANDOM_STATE):
+    def __init__(self, n_estimators=200, contamination=0.01, majority_only=True, random_state=RANDOM_STATE):
         self.n_estimators = n_estimators
         self.contamination = contamination
+        self.majority_only = majority_only
         self.random_state = random_state
 
     def fit_resample(self, X, y):
@@ -49,9 +53,15 @@ class OutlierRemover(BaseEstimator):
             n_jobs=-1
         )
         
-        # Fit IsolationForest and predict outliers in one step
-        preds = self.iso_forest_.fit_predict(X)
-        mask = preds == 1  # 1 = inlier, -1 = outlier
+        y_arr = np.asarray(y).ravel()
+        X_arr = X.to_numpy() if isinstance(X, pd.DataFrame) else np.asarray(X)
+        # Only rows of the majority class are candidates for removal
+        candidates = y_arr == 0 if self.majority_only else np.ones(len(y_arr), dtype=bool)
+
+        # Fit IsolationForest on candidate rows and flag outliers among them
+        preds = self.iso_forest_.fit_predict(X_arr[candidates])
+        mask = np.ones(len(y_arr), dtype=bool)  # True = keep
+        mask[np.flatnonzero(candidates)[preds == -1]] = False  # -1 = outlier
 
         # Filter X
         if isinstance(X, pd.DataFrame):
@@ -67,7 +77,9 @@ class OutlierRemover(BaseEstimator):
 
         n_removed = (~mask).sum()
         if n_removed > 0:
-            logger.info(f"OutlierRemover: removed {n_removed} outliers ({n_removed / len(X) * 100:.2f}%)")
+            n_fraud_removed = int(y_arr[~mask].sum())
+            logger.info(f"OutlierRemover: removed {n_removed} outliers ({n_removed / len(X) * 100:.2f}%), "
+                        f"of which {n_fraud_removed} are fraud")
 
         return X_filtered, y_filtered
 
@@ -141,7 +153,7 @@ def create_preprocessing_pipeline(
     Pipeline steps:
         1. Winsorizer  — cap extreme values (1st & 99th percentile)
         2. RobustScaler — normalize features
-        3. OutlierRemover — remove outliers via IsolationForest (custom transformer)
+        3. OutlierRemover — remove outliers of the normal class via IsolationForest (custom sampler)
         4. SMOTE — oversample minority class
         5. Model
 
@@ -168,6 +180,7 @@ def create_preprocessing_pipeline(
         ("outlier_remover", OutlierRemover(
             n_estimators=200,
             contamination=contamination,
+            majority_only=OUTLIER_MAJORITY_ONLY,
             random_state=RANDOM_STATE
         )),
         ("resampler", SMOTE(
